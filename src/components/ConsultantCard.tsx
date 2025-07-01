@@ -1,12 +1,22 @@
-import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Pencil, Trash2, Loader2 } from 'lucide-react';
-import { ConsultantProfile, consultantApi } from '@/lib/consultantApi';
-import { useToast } from '@/components/ui/use-toast';
-import ConsultantForm from './ConsultantForm';
+import React, { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Pencil, Trash2, Loader2 } from "lucide-react";
+import { ConsultantProfile, consultantApi } from "@/lib/consultantApi";
+import { useToast } from "@/components/ui/use-toast";
+import ConsultantForm from "./ConsultantForm";
 
 interface ConsultantCardProps {
   consultant: ConsultantProfile;
@@ -14,49 +24,66 @@ interface ConsultantCardProps {
   onDelete: (id: number) => void;
 }
 
-const ConsultantCard: React.FC<ConsultantCardProps> = ({ consultant, onUpdate, onDelete }) => {
+const ConsultantCard: React.FC<ConsultantCardProps> = ({
+  consultant,
+  onUpdate,
+  onDelete,
+}) => {
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Debug log to spot missing id
+  if (!consultant.id) {
+    console.warn("ConsultantCard: consultant is missing id:", consultant);
+  } else {
+    console.log(
+      "ConsultantCard: consultant with id:",
+      consultant.id,
+      consultant
+    );
+  }
+
   const getAvailabilityColor = (availability: string) => {
     switch (availability) {
-      case 'available':
-        return 'bg-green-100 text-green-800';
-      case 'busy':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'unavailable':
-        return 'bg-red-100 text-red-800';
+      case "available":
+        return "bg-green-100 text-green-800";
+      case "busy":
+        return "bg-yellow-100 text-yellow-800";
+      case "unavailable":
+        return "bg-red-100 text-red-800";
       default:
-        return 'bg-gray-100 text-gray-800';
+        return "bg-gray-100 text-gray-800";
     }
   };
 
   const handleUpdate = async (updatedData: ConsultantProfile) => {
     try {
       if (!consultant.id) {
-        throw new Error('Consultant ID is missing');
+        throw new Error("Consultant ID is missing");
       }
 
       // Remove the id from the update data to match the backend schema
       const { id, ...updatePayload } = updatedData;
-      
+
       // Call the API to update the consultant
       await consultantApi.updateConsultant(consultant.id, updatePayload);
-      
+
       // Update the local state with the new data
       onUpdate({ ...updatePayload, id: consultant.id });
       setIsEditing(false);
-      
+
       toast({
         title: "Success",
         description: "Consultant updated successfully",
       });
-    } catch (error: any) {
-      console.error('Error updating consultant:', error);
+    } catch (error: unknown) {
+      console.error("Error updating consultant:", error);
+      const message =
+        error instanceof Error ? error.message : "Failed to update consultant";
       toast({
         title: "Error",
-        description: error.message || "Failed to update consultant",
+        description: message,
         variant: "destructive",
       });
     }
@@ -65,7 +92,7 @@ const ConsultantCard: React.FC<ConsultantCardProps> = ({ consultant, onUpdate, o
   const handleDelete = async () => {
     try {
       if (!consultant.id) {
-        throw new Error('Consultant ID is missing');
+        throw new Error("Consultant ID is missing");
       }
 
       setIsDeleting(true);
@@ -75,11 +102,13 @@ const ConsultantCard: React.FC<ConsultantCardProps> = ({ consultant, onUpdate, o
         title: "Success",
         description: "Consultant deleted successfully",
       });
-    } catch (error: any) {
-      console.error('Error deleting consultant:', error);
+    } catch (error: unknown) {
+      console.error("Error deleting consultant:", error);
+      const message =
+        error instanceof Error ? error.message : "Failed to delete consultant";
       toast({
         title: "Error",
-        description: error.message || "Failed to delete consultant",
+        description: message,
         variant: "destructive",
       });
     } finally {
@@ -129,12 +158,14 @@ const ConsultantCard: React.FC<ConsultantCardProps> = ({ consultant, onUpdate, o
               <AlertDialogHeader>
                 <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This action cannot be undone. This will permanently delete the consultant profile
-                  for {consultant.name}.
+                  This action cannot be undone. This will permanently delete the
+                  consultant profile for {consultant.name}.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                <AlertDialogCancel disabled={isDeleting}>
+                  Cancel
+                </AlertDialogCancel>
                 <AlertDialogAction
                   onClick={handleDelete}
                   disabled={isDeleting}
@@ -146,7 +177,7 @@ const ConsultantCard: React.FC<ConsultantCardProps> = ({ consultant, onUpdate, o
                       Deleting...
                     </>
                   ) : (
-                    'Delete'
+                    "Delete"
                   )}
                 </AlertDialogAction>
               </AlertDialogFooter>
@@ -181,7 +212,8 @@ const ConsultantCard: React.FC<ConsultantCardProps> = ({ consultant, onUpdate, o
           <div>
             <p className="text-sm font-medium text-gray-500">Availability</p>
             <Badge className={getAvailabilityColor(consultant.availability)}>
-              {consultant.availability.charAt(0).toUpperCase() + consultant.availability.slice(1)}
+              {consultant.availability.charAt(0).toUpperCase() +
+                consultant.availability.slice(1)}
             </Badge>
           </div>
           <div>
@@ -196,8 +228,12 @@ const ConsultantCard: React.FC<ConsultantCardProps> = ({ consultant, onUpdate, o
           </div>
           {consultant.project && (
             <div>
-              <p className="text-sm font-medium text-gray-500">Project Details</p>
-              <p className="text-sm whitespace-pre-wrap">{consultant.project}</p>
+              <p className="text-sm font-medium text-gray-500">
+                Project Details
+              </p>
+              <p className="text-sm whitespace-pre-wrap">
+                {consultant.project}
+              </p>
             </div>
           )}
         </div>

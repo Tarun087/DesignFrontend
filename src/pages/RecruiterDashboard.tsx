@@ -1,116 +1,184 @@
-import React, { useState, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Plus, Search, Users, Briefcase, Clock, TrendingUp, Download, Upload } from 'lucide-react';
-import Header from '@/components/Header';
-import ConsultantForm from '@/components/ConsultantForm';
-import ConsultantCard from '@/components/ConsultantCard';
-import ConsultantDetailsModal from '@/components/ConsultantDetailsModal';
-import ResumeUploadForm from '@/components/ResumeUploadForm';
-import AgentPerformanceCard from '@/components/AgentPerformanceCard';
-import apiClient from '@/lib/api';
-import { useToast } from '@/hooks/use-toast';
+import React, { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Plus,
+  Search,
+  Users,
+  Briefcase,
+  Clock,
+  TrendingUp,
+  Download,
+  Upload,
+} from "lucide-react";
+import Header from "@/components/Header";
+import ConsultantForm from "@/components/ConsultantForm";
+import ConsultantCard from "@/components/ConsultantCard";
+import ConsultantDetailsModal from "@/components/ConsultantDetailsModal";
+import ResumeUploadForm from "@/components/ResumeUploadForm";
+import AgentPerformanceCard from "@/components/AgentPerformanceCard";
+import apiClient from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
+import { ConsultantProfile } from "@/lib/consultantApi";
+import { getAllJobs, getPendingJobs } from "@/lib/api";
+import JobDetailsModal from "@/components/JobDetailsModal";
+
+const fetchJobs = async () => {
+  const { data } = await apiClient.get("/job-description/");
+  return data;
+};
 
 const fetchConsultants = async () => {
-  const { data } = await apiClient.get('/consultant-profile/');
+  const { data } = await apiClient.get("/consultant-profile/");
   return data;
 };
 
 const RecruiterDashboard = () => {
-  const [currentUser, setCurrentUser] = useState('');
+  const [currentUser, setCurrentUser] = useState("");
   const [showConsultantForm, setShowConsultantForm] = useState(false);
   const [showResumeUpload, setShowResumeUpload] = useState(false);
   const [selectedConsultant, setSelectedConsultant] = useState(null);
   const [editingConsultant, setEditingConsultant] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [showJobsModal, setShowJobsModal] = useState(false);
+  const [selectedJob, setSelectedJob] = useState(null);
 
   useEffect(() => {
-    const storedEmail = localStorage.getItem('userEmail');
+    const storedEmail = localStorage.getItem("userEmail");
     if (storedEmail) {
       setCurrentUser(storedEmail);
     }
   }, []);
 
-  const { data: consultants = [], isLoading, isError } = useQuery({
-    queryKey: ['consultants'],
+  const {
+    data: jobs = [],
+    isLoading: isJobsLoading,
+    isError: isJobsError,
+  } = useQuery({
+    queryKey: ["jobs"],
+    queryFn: fetchJobs,
+  });
+
+  const {
+    data: consultants = [],
+    isLoading: isConsultantsLoading,
+    isError: isConsultantsError,
+  } = useQuery({
+    queryKey: ["consultants"],
     queryFn: fetchConsultants,
   });
 
-  // Mock data for dashboard stats - will need to be replaced with API calls
   const dashboardStats = {
-    totalJobs: 15,
-    pendingJobs: 6,
+    totalJobs: jobs.length,
+    pendingJobs: jobs.filter((job) => job.status === "pending").length,
     totalConsultants: consultants.length,
-    activeConsultants: consultants.filter(c => c.availability === 'available').length
+    activeConsultants: consultants.filter((c) => c.availability === "available")
+      .length,
   };
 
   const agentPerformance = [
     {
-      name: 'Comparison Agent',
+      name: "Comparison Agent",
       jobsAssigned: 18,
       successRate: 92,
-      avgResponseTime: '1.8 hours',
-      rating: 4.8
+      avgResponseTime: "1.8 hours",
+      rating: 4.8,
     },
     {
-      name: 'Ranking Agent',
+      name: "Ranking Agent",
       jobsAssigned: 22,
       successRate: 89,
-      avgResponseTime: '2.1 hours',
-      rating: 4.6
+      avgResponseTime: "2.1 hours",
+      rating: 4.6,
     },
     {
-      name: 'Communication Agent',
+      name: "Communication Agent",
       jobsAssigned: 16,
       successRate: 94,
-      avgResponseTime: '1.5 hours',
-      rating: 4.9
-    }
+      avgResponseTime: "1.5 hours",
+      rating: 4.9,
+    },
   ];
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('userEmail');
-    window.location.href = '/auth';
+    localStorage.removeItem("token");
+    localStorage.removeItem("userEmail");
+    window.location.href = "/auth";
   };
 
-  const addConsultantMutation = useMutation({
-    mutationFn: (newConsultant) => apiClient.post('/consultant-profile/', newConsultant),
+  const addConsultantMutation = useMutation<
+    ConsultantProfile,
+    unknown,
+    ConsultantProfile
+  >({
+    mutationFn: (newConsultant: ConsultantProfile) =>
+      apiClient
+        .post("/consultant-profile/", newConsultant)
+        .then((res) => res.data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['consultants'] });
-      toast({ title: 'Success', description: 'Consultant added.' });
+      queryClient.invalidateQueries({ queryKey: ["consultants"] });
+      toast({ title: "Success", description: "Consultant added." });
     },
     onError: () => {
-      toast({ title: 'Error', description: 'Could not add consultant.', variant: 'destructive' });
-    }
+      toast({
+        title: "Error",
+        description: "Could not add consultant.",
+        variant: "destructive",
+      });
+    },
   });
 
-  const updateConsultantMutation = useMutation({
-    mutationFn: (updatedConsultant) => apiClient.put(`/consultant-profile/${updatedConsultant.id}`, updatedConsultant),
+  const updateConsultantMutation = useMutation<
+    ConsultantProfile,
+    unknown,
+    ConsultantProfile
+  >({
+    mutationFn: (updatedConsultant: ConsultantProfile) =>
+      apiClient
+        .put(`/consultant-profile/${updatedConsultant.id}`, updatedConsultant)
+        .then((res) => res.data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['consultants'] });
-      toast({ title: 'Success', description: 'Consultant updated.' });
+      queryClient.invalidateQueries({ queryKey: ["consultants"] });
+      toast({ title: "Success", description: "Consultant updated." });
     },
     onError: () => {
-      toast({ title: 'Error', description: 'Could not update consultant.', variant: 'destructive' });
-    }
+      toast({
+        title: "Error",
+        description: "Could not update consultant.",
+        variant: "destructive",
+      });
+    },
   });
 
   const deleteConsultantMutation = useMutation({
-    mutationFn: (consultantId) => apiClient.delete(`/consultant-profile/${consultantId}`),
+    mutationFn: (consultantId) =>
+      apiClient.delete(`/consultant-profile/${consultantId}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['consultants'] });
-      toast({ title: 'Success', description: 'Consultant deleted.' });
+      queryClient.invalidateQueries({ queryKey: ["consultants"] });
+      toast({ title: "Success", description: "Consultant deleted." });
     },
     onError: () => {
-      toast({ title: 'Error', description: 'Could not delete consultant.', variant: 'destructive' });
-    }
+      toast({
+        title: "Error",
+        description: "Could not delete consultant.",
+        variant: "destructive",
+      });
+    },
   });
 
-  const handleAddConsultant = (consultantData) => {
+  const handleAddConsultant = (consultantData: ConsultantProfile) => {
+    if (!consultantData.id) {
+      toast({
+        title: "Error",
+        description: "Failed to add consultant: missing ID from backend.",
+        variant: "destructive",
+      });
+      console.warn("Attempted to add consultant without id:", consultantData);
+      return;
+    }
     if (editingConsultant) {
       const updatedConsultant = { ...consultantData, id: editingConsultant.id };
       updateConsultantMutation.mutate(updatedConsultant);
@@ -129,7 +197,7 @@ const RecruiterDashboard = () => {
   };
 
   const handleDeleteConsultant = (id) => {
-    if (window.confirm('Are you sure you want to delete this consultant?')) {
+    if (window.confirm("Are you sure you want to delete this consultant?")) {
       deleteConsultantMutation.mutate(id);
     }
   };
@@ -145,32 +213,49 @@ const RecruiterDashboard = () => {
   };
 
   const handleDownloadReport = (consultant) => {
-    console.log('Downloading report for:', consultant.name);
+    console.log("Downloading report for:", consultant.name);
     alert(`Downloading assignment report for ${consultant.name}`);
   };
 
-  const filteredConsultants = consultants.filter(consultant =>
-    consultant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    consultant.skills.some(skill => skill.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    consultant.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    consultant.availability.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredConsultants = consultants.filter(
+    (consultant) =>
+      consultant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      consultant.skills.some((skill) =>
+        skill.toLowerCase().includes(searchTerm.toLowerCase())
+      ) ||
+      consultant.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      consultant.availability.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header currentUser={currentUser} onLogout={handleLogout} dashboardTitle="Recruiter Dashboard" />
-      
+      <Header
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        dashboardTitle="Recruiter Dashboard"
+      />
+
       <main className="container mx-auto px-6 py-8">
         {!showConsultantForm && !showResumeUpload ? (
           <>
             {/* Dashboard Stats */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-              <div className="bg-white p-6 rounded-lg shadow-sm border">
+              <div
+                className="bg-white p-6 rounded-lg shadow-sm border cursor-pointer hover:bg-blue-50"
+                onClick={() => setShowJobsModal(true)}
+                title="View all jobs"
+              >
                 <div className="flex items-center">
                   <Briefcase className="w-8 h-8 text-blue-500" />
                   <div className="ml-4">
                     <p className="text-sm text-gray-600">Total Jobs</p>
-                    <p className="text-2xl font-bold text-gray-900">{dashboardStats.totalJobs}</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {isJobsLoading
+                        ? "..."
+                        : isJobsError
+                        ? "Error"
+                        : dashboardStats.totalJobs}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -179,7 +264,13 @@ const RecruiterDashboard = () => {
                   <Clock className="w-8 h-8 text-orange-500" />
                   <div className="ml-4">
                     <p className="text-sm text-gray-600">Pending Jobs</p>
-                    <p className="text-2xl font-bold text-gray-900">{dashboardStats.pendingJobs}</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {isJobsLoading
+                        ? "..."
+                        : isJobsError
+                        ? "Error"
+                        : dashboardStats.pendingJobs}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -188,7 +279,13 @@ const RecruiterDashboard = () => {
                   <Users className="w-8 h-8 text-green-500" />
                   <div className="ml-4">
                     <p className="text-sm text-gray-600">Total Consultants</p>
-                    <p className="text-2xl font-bold text-gray-900">{dashboardStats.totalConsultants}</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {isConsultantsLoading
+                        ? "..."
+                        : isConsultantsError
+                        ? "Error"
+                        : dashboardStats.totalConsultants}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -197,7 +294,13 @@ const RecruiterDashboard = () => {
                   <TrendingUp className="w-8 h-8 text-purple-500" />
                   <div className="ml-4">
                     <p className="text-sm text-gray-600">Available</p>
-                    <p className="text-2xl font-bold text-gray-900">{dashboardStats.activeConsultants}</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {isConsultantsLoading
+                        ? "..."
+                        : isConsultantsError
+                        ? "Error"
+                        : dashboardStats.activeConsultants}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -205,13 +308,18 @@ const RecruiterDashboard = () => {
 
             <div className="flex items-center justify-between mb-8">
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">Consultant Management</h2>
+                <h2 className="text-2xl font-bold text-gray-900">
+                  Consultant Management
+                </h2>
                 <p className="text-gray-600 mt-1">
                   Browse, add, and manage consultant profiles
                 </p>
               </div>
               <div className="flex items-center space-x-3">
-                <Button onClick={() => setShowResumeUpload(true)} variant="outline">
+                <Button
+                  onClick={() => setShowResumeUpload(true)}
+                  variant="outline"
+                >
                   <Upload className="w-4 h-4 mr-2" />
                   Upload Resumes
                 </Button>
@@ -233,45 +341,102 @@ const RecruiterDashboard = () => {
                 />
               </div>
             </div>
-            
-            {isLoading && <p>Loading...</p>}
-            {isError && <p>Error fetching consultants.</p>}
-            {!isLoading && !isError && filteredConsultants.length === 0 ? (
+
+            {isConsultantsLoading && <p>Loading...</p>}
+            {isConsultantsError && <p>Error fetching consultants.</p>}
+            {!isConsultantsLoading &&
+            !isConsultantsError &&
+            filteredConsultants.length === 0 ? (
               <div className="text-center py-12">
                 <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">
                   No consultants found
                 </h3>
-                <p className="text-gray-500">No consultants match your search.</p>
+                <p className="text-gray-500">
+                  No consultants match your search.
+                </p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredConsultants.map(consultant => (
+                {filteredConsultants.map((consultant: ConsultantProfile) => (
                   <ConsultantCard
                     key={consultant.id}
                     consultant={consultant}
-                    onViewDetails={handleViewDetails}
-                    onEdit={handleEditConsultant}
+                    onUpdate={handleEditConsultant}
                     onDelete={handleDeleteConsultant}
-                    onDownloadReport={handleDownloadReport}
                   />
                 ))}
               </div>
             )}
 
             <div className="bg-white p-6 rounded-lg shadow-sm border mt-8">
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Agent Performance</h3>
+              <h3 className="text-xl font-bold text-gray-900 mb-4">
+                Agent Performance
+              </h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {agentPerformance.map(agent => (
+                {agentPerformance.map((agent) => (
                   <AgentPerformanceCard key={agent.name} agent={agent} />
                 ))}
               </div>
             </div>
+
+            {/* Jobs Modal */}
+            {showJobsModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+                <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full p-6 relative">
+                  <button
+                    className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
+                    onClick={() => setShowJobsModal(false)}
+                  >
+                    ×
+                  </button>
+                  <h2 className="text-xl font-bold mb-4">All Jobs</h2>
+                  {isJobsLoading ? (
+                    <p>Loading...</p>
+                  ) : isJobsError ? (
+                    <p>Error loading jobs.</p>
+                  ) : jobs.length === 0 ? (
+                    <p>No jobs found.</p>
+                  ) : (
+                    <ul className="divide-y divide-gray-200 max-h-80 overflow-y-auto">
+                      {jobs.map((job) => (
+                        <li
+                          key={job.id}
+                          className="py-3 px-2 hover:bg-gray-50 cursor-pointer"
+                          onClick={() => {
+                            setSelectedJob(job);
+                            setShowJobsModal(false);
+                          }}
+                        >
+                          <div className="font-medium text-gray-900">
+                            {job.title}
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            {job.department} | {job.location}
+                          </div>
+                          <div className="text-xs text-gray-400">
+                            Status: {job.status}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Job Details Modal */}
+            {selectedJob && (
+              <JobDetailsModal
+                job={selectedJob}
+                onClose={() => setSelectedJob(null)}
+              />
+            )}
           </>
         ) : (
           <div>
             <Button onClick={handleCloseForm} variant="ghost" className="mb-4">
-                Cancel
+              Cancel
             </Button>
             {showConsultantForm && (
               <ConsultantForm
@@ -280,7 +445,12 @@ const RecruiterDashboard = () => {
                 onCancel={handleCloseForm}
               />
             )}
-            {showResumeUpload && <ResumeUploadForm onCancel={handleCloseForm} />}
+            {showResumeUpload && (
+              <ResumeUploadForm
+                onSubmit={handleAddConsultant}
+                onClose={handleCloseForm}
+              />
+            )}
           </div>
         )}
       </main>
@@ -288,6 +458,7 @@ const RecruiterDashboard = () => {
       {selectedConsultant && (
         <ConsultantDetailsModal
           consultant={selectedConsultant}
+          isOpen={Boolean(selectedConsultant)}
           onClose={() => setSelectedConsultant(null)}
         />
       )}
