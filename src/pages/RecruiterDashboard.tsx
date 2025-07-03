@@ -23,6 +23,24 @@ import { useToast } from "@/hooks/use-toast";
 import { ConsultantProfile } from "@/lib/consultantApi";
 import { getAllJobs, getPendingJobs } from "@/lib/api";
 import JobDetailsModal from "@/components/JobDetailsModal";
+import JobDescriptionForm from "@/components/JobDescriptionForm";
+import JobDescriptionCard from "@/components/JobDescriptionCard";
+
+interface JobDescription {
+  id: string;
+  title: string;
+  department: string;
+  location: string;
+  description: string;
+  skills: string[];
+  experience: string;
+  created_at: string;
+  workflow?: {
+    jdCompared: boolean;
+    matchesFound: boolean;
+    emailSent: boolean;
+  };
+}
 
 const fetchJobs = async () => {
   const { data } = await apiClient.get("/job-description/");
@@ -45,6 +63,12 @@ const RecruiterDashboard = () => {
   const queryClient = useQueryClient();
   const [showJobsModal, setShowJobsModal] = useState(false);
   const [selectedJob, setSelectedJob] = useState(null);
+  const [showJobForm, setShowJobForm] = useState(false);
+  const [editingJob, setEditingJob] = useState<JobDescription | null>(null);
+  const [agentPerformance, setAgentPerformance] = useState([]);
+  const [isAgentPerformanceLoading, setIsAgentPerformanceLoading] =
+    useState(true);
+  const [isAgentPerformanceError, setIsAgentPerformanceError] = useState(false);
 
   useEffect(() => {
     const storedEmail = localStorage.getItem("userEmail");
@@ -79,29 +103,46 @@ const RecruiterDashboard = () => {
       .length,
   };
 
-  const agentPerformance = [
-    {
-      name: "Comparison Agent",
-      jobsAssigned: 18,
-      successRate: 92,
-      avgResponseTime: "1.8 hours",
-      rating: 4.8,
-    },
-    {
-      name: "Ranking Agent",
-      jobsAssigned: 22,
-      successRate: 89,
-      avgResponseTime: "2.1 hours",
-      rating: 4.6,
-    },
-    {
-      name: "Communication Agent",
-      jobsAssigned: 16,
-      successRate: 94,
-      avgResponseTime: "1.5 hours",
-      rating: 4.9,
-    },
-  ];
+  useEffect(() => {
+    const fetchAgentPerformance = async () => {
+      setIsAgentPerformanceLoading(true);
+      setIsAgentPerformanceError(false);
+      try {
+        // TODO: Replace with real backend endpoint when available
+        // const response = await apiClient.get("/agent-performance");
+        // setAgentPerformance(response.data);
+        // Mocked data for now:
+        setAgentPerformance([
+          {
+            name: "Comparison Agent",
+            jobsAssigned: 18,
+            successRate: 92,
+            avgResponseTime: "1.8 hours",
+            rating: 4.8,
+          },
+          {
+            name: "Ranking Agent",
+            jobsAssigned: 22,
+            successRate: 89,
+            avgResponseTime: "2.1 hours",
+            rating: 4.6,
+          },
+          {
+            name: "Communication Agent",
+            jobsAssigned: 16,
+            successRate: 94,
+            avgResponseTime: "1.5 hours",
+            rating: 4.9,
+          },
+        ]);
+      } catch (error) {
+        setIsAgentPerformanceError(true);
+      } finally {
+        setIsAgentPerformanceLoading(false);
+      }
+    };
+    fetchAgentPerformance();
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -226,6 +267,93 @@ const RecruiterDashboard = () => {
       consultant.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
       consultant.availability.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const addJobMutation = useMutation<
+    JobDescription,
+    unknown,
+    Partial<JobDescription>
+  >({
+    mutationFn: (jobData) =>
+      apiClient.post("/job-description/", jobData).then((res) => res.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      toast({ title: "Success", description: "Job created." });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Could not create job.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateJobMutation = useMutation<
+    JobDescription,
+    unknown,
+    { id: string } & Partial<JobDescription>
+  >({
+    mutationFn: ({ id, ...jobData }) =>
+      apiClient.put(`/job-description/${id}`, jobData).then((res) => res.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      toast({ title: "Success", description: "Job updated." });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Could not update job.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteJobMutation = useMutation({
+    mutationFn: (id) => apiClient.delete(`/job-description/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      toast({ title: "Success", description: "Job deleted." });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Could not delete job.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleAddJob = () => {
+    setEditingJob(null);
+    setShowJobForm(true);
+  };
+
+  const handleEditJob = (job) => {
+    setEditingJob(job);
+    setShowJobForm(true);
+  };
+
+  const handleDeleteJob = (id) => {
+    if (window.confirm("Are you sure you want to delete this job?")) {
+      deleteJobMutation.mutate(id);
+    }
+  };
+
+  const handleSubmitJob = (jobData: Partial<JobDescription> | null) => {
+    if (!jobData || typeof jobData !== "object") return;
+    if (editingJob && editingJob.id) {
+      updateJobMutation.mutate({ id: editingJob.id, ...jobData });
+    } else {
+      addJobMutation.mutate(jobData);
+    }
+    setShowJobForm(false);
+    setEditingJob(null);
+  };
+
+  const handleCloseJobForm = () => {
+    setShowJobForm(false);
+    setEditingJob(null);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -373,11 +501,17 @@ const RecruiterDashboard = () => {
               <h3 className="text-xl font-bold text-gray-900 mb-4">
                 Agent Performance
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {agentPerformance.map((agent) => (
-                  <AgentPerformanceCard key={agent.name} agent={agent} />
-                ))}
-              </div>
+              {isAgentPerformanceLoading ? (
+                <p>Loading agent performance...</p>
+              ) : isAgentPerformanceError ? (
+                <p>Error loading agent performance.</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {agentPerformance.map((agent) => (
+                    <AgentPerformanceCard key={agent.name} agent={agent} />
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Jobs Modal */}
@@ -403,24 +537,39 @@ const RecruiterDashboard = () => {
                         <li
                           key={job.id}
                           className="py-3 px-2 hover:bg-gray-50 cursor-pointer"
-                          onClick={() => {
-                            setSelectedJob(job);
-                            setShowJobsModal(false);
-                          }}
                         >
-                          <div className="font-medium text-gray-900">
-                            {job.title}
-                          </div>
-                          <div className="text-sm text-gray-600">
-                            {job.department} | {job.location}
-                          </div>
-                          <div className="text-xs text-gray-400">
-                            Status: {job.status}
-                          </div>
+                          <JobDescriptionCard
+                            job={job}
+                            onViewDetails={() => {
+                              setSelectedJob(job);
+                              setShowJobsModal(false);
+                            }}
+                            onEdit={handleEditJob}
+                            onDelete={handleDeleteJob}
+                          />
                         </li>
                       ))}
                     </ul>
                   )}
+                </div>
+              </div>
+            )}
+
+            {/* Job Form Modal */}
+            {showJobForm && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+                <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full p-6 relative">
+                  <button
+                    className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
+                    onClick={handleCloseJobForm}
+                  >
+                    ×
+                  </button>
+                  <JobDescriptionForm
+                    onSubmit={handleSubmitJob}
+                    onClose={handleCloseJobForm}
+                    editingJob={editingJob}
+                  />
                 </div>
               </div>
             )}

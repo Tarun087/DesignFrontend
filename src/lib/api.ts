@@ -50,13 +50,15 @@ apiClient.interceptors.response.use(
   }
 );
 
-export const getTop3Matches = async (jobId: string) => {
-  const response = await apiClient.get(`/match/top-3-matches/${jobId}`);
+export const getTop3Matches = async (jobId: string | number) => {
+  const response = await apiClient.get(
+    `/match-result/top-3-matches/${parseInt(String(jobId), 10)}`
+  );
   return response.data;
 };
 
 export const getWorkflowStatusByJobId = async (jobId: string) => {
-  const response = await apiClient.get(`/workflow/job_description/${jobId}`);
+  const response = await apiClient.get(`/job-description/${jobId}`);
   return response.data;
 };
 
@@ -74,6 +76,18 @@ export const getPendingJobs = async () => {
   const response = await apiClient.get("/job-description/");
   // Filter jobs with status 'pending'
   return response.data.filter((job: Job) => job.status === "pending");
+};
+
+export const getWorkflowStatusByJobDescriptionId = async (
+  jobDescriptionId: string
+) => {
+  const response = await apiClient.get("/workflow-status/");
+  // Find the workflow status for the given job description ID
+  const allStatuses = response.data;
+  return allStatuses.find(
+    (status: any) =>
+      String(status.job_description_id) === String(jobDescriptionId)
+  );
 };
 
 export default apiClient;

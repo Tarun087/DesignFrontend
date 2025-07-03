@@ -8,6 +8,7 @@ import RecruiterDashboard from "./pages/RecruiterDashboard";
 import AuthPage from "./pages/AuthPage";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
+import ARDashboard from "./pages/ARDashboard";
 
 const queryClient = new QueryClient();
 
@@ -22,6 +23,7 @@ const App = () => (
           <Route element={<ProtectedRoute />}>
             <Route path="/" element={<Index />} />
             <Route path="/recruiter" element={<RecruiterDashboard />} />
+            <Route path="/ar-dashboard" element={<ARDashboard />} />
           </Route>
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
